@@ -190,7 +190,7 @@ class QAData(object):
             with open(psg_sel_fn, "r") as f:
                 fg_passages = json.load(f)
                 assert len(fg_passages)==len(dpr_passages)
-                dpr_passages = [[psgs[i] for i in fg_psgs] for psgs, fg_psgs in zip(dpr_passages, fg_passages)]
+                fg_passages = dpr_passages
 
             self.logger.info("Start processing DPR data")
             if self.passages.tokenized_data is None:
