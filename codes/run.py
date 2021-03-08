@@ -19,7 +19,7 @@ from models.biencoder import MyBiEncoder
 def run(args, logger):
 
     args.dpr = args.task=="dpr"
-    args.is_seq2seq = 'bart' in args.bert_name
+    args.is_seq2seq = 'bart' in args.bert_name or 't5' in args.bert_name
     if 'bart' in args.bert_name:
         tokenizer = BartTokenizer.from_pretrained(args.bert_name)
         tokenizer.add_tokens(["<SEP>"])
@@ -198,7 +198,7 @@ def train(args, logger, model, train_data, dev_data, optimizer, scheduler):
 def inference(model, dev_data, save_predictions=False):
     if dev_data.args.dpr:
         return inference_dpr(model, dev_data, save_predictions)
-    if "bart" in dev_data.args.bert_name:
+    if "bart" in dev_data.args.bert_name or "t5" in dev_data.args.bert_name:
         return inference_seq2seq(model if dev_data.args.n_gpu==1 or dev_data.args.do_predict else model.module, dev_data, save_predictions)
     return inference_span_predictor(model, dev_data, save_predictions)
 
