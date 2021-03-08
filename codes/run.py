@@ -3,8 +3,8 @@ import numpy as np
 import torch
 
 from tqdm import tqdm
-from transformers import BartTokenizer, AlbertTokenizer, BertTokenizer
-from transformers import BartConfig, AlbertConfig, BertConfig
+from transformers import BartTokenizer, T5Tokenizer, AlbertTokenizer, BertTokenizer
+from transformers import BartConfig, T5Config, AlbertConfig, BertConfig
 from transformers import AdamW, get_linear_schedule_with_warmup
 
 from QAData import QAData, AmbigQAData
@@ -12,7 +12,7 @@ from QGData import QGData, AmbigQGData
 from PassageData import PassageData
 
 from models.span_predictor import SpanPredictor, AlbertSpanPredictor
-from models.seq2seq import MyBart
+from models.seq2seq import MyBart, MyT5
 from models.seq2seq_with_prefix import MyBartWithPrefix
 from models.biencoder import MyBiEncoder
 
@@ -26,6 +26,11 @@ def run(args, logger):
         Model = MyBartWithPrefix if args.do_predict and args.nq_answer_as_prefix else MyBart
         Config = BartConfig
         args.append_another_bos = True
+    elif 't5' in args.bert_name:
+        print("Using T5 model")
+        tokenizer = T5Tokenizer.from_pretrained(args.bert_name)
+        Model = MyT5
+        Config = T5Config
     elif 'albert' in args.bert_name:
         tokenizer = AlbertTokenizer.from_pretrained(args.bert_name)
         Model = AlbertSpanPredictor
@@ -128,6 +133,8 @@ def train(args, logger, model, train_data, dev_data, optimizer, scheduler):
         for batch in train_data.dataloader:
             global_step += 1
             batch = [b.to(torch.device("cuda")) for b in batch]
+            print("=============== Next batch of epoch", epoch, "===============")
+            print(batch)
             if args.is_seq2seq:
                 loss = model(input_ids=batch[0], attention_mask=batch[1],
                              decoder_input_ids=batch[2], decoder_attention_mask=batch[3],
