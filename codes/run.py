@@ -29,8 +29,10 @@ def run(args, logger):
     elif 't5' in args.bert_name:
         print("Using T5 model")
         tokenizer = T5Tokenizer.from_pretrained(args.bert_name)
+        tokenizer.add_tokens(["<SEP>"])
         Model = MyT5
         Config = T5Config
+        args.append_another_bos = True
     elif 'albert' in args.bert_name:
         tokenizer = AlbertTokenizer.from_pretrained(args.bert_name)
         Model = AlbertSpanPredictor
@@ -65,7 +67,7 @@ def run(args, logger):
             return {_convert(key):value for key, value in state_dict.items()}
         state_dict = convert_to_single_gpu(torch.load(checkpoint))
         model = Model(Config.from_pretrained(args.bert_name))
-        if "bart" in args.bert_name:
+        if "bart" in args.bert_name or "t5" in args.bert_name:
             model.resize_token_embeddings(len(tokenizer))
         logger.info("Loading from {}".format(checkpoint))
         return model.from_pretrained(None, config=model.config, state_dict=state_dict)
@@ -89,7 +91,7 @@ def run(args, logger):
             model = _load_from_checkpoint(args.checkpoint)
         else:
             model = Model.from_pretrained(args.bert_name)
-        if "bart" in args.bert_name:
+        if "bart" in args.bert_name or "t5" in args.bert_name:
             model.resize_token_embeddings(len(tokenizer))
         if args.n_gpu>1:
             model = torch.nn.DataParallel(model)
