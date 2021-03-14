@@ -164,6 +164,8 @@ class QAData(object):
             self.data_type+"_20200201" if self.args.wiki_2020 else self.data_type, postfix)
         if "Bart" in postfix:
             return self.load_dpr_data_bart(dpr_retrieval_path, dpr_tokenized_path)
+        elif "T5" in postfix:
+            return self.load_dpr_data_t5(dpr_retrieval_path, dpr_tokenized_path)
         elif "Bert" in postfix or "Albert" in postfix:
             return self.load_dpr_data_bert(dpr_retrieval_path, dpr_tokenized_path)
         else:
@@ -250,7 +252,8 @@ class QAData(object):
             tokens = self.tokenized_data[2][idx]
             if 0 in self.tokenized_data[3][idx]:
                 tokens = tokens[:self.tokenized_data[3][idx].index(0)]
-            assert tokens[0]==tokens[1]==self.tokenizer.bos_token_id and tokens[-1]==self.tokenizer.eos_token_id
+            if "T5" not in self.tokenizer.__class__.__name__.replace("zer", "zed"):
+                assert tokens[0]==tokens[1]==self.tokenizer.bos_token_id and tokens[-1]==self.tokenizer.eos_token_id
             return tokens[2:-1]
 
         for idx, (curr_input_ids, curr_attention_mask, curr_metadata) in enumerate(zip(
@@ -516,6 +519,8 @@ class AmbigQAData(QAData):
         dpr_tokenized_path = self.data_path.replace(".json", "_dpr{}.json".format("_20200201" if self.args.wiki_2020 else ""))
         if "Bart" in postfix:
             return self.load_dpr_data_bart(dpr_retrieval_path, dpr_tokenized_path)
+        if "T5" in postfix:
+            return self.load_dpr_data_t5(dpr_retrieval_path, dpr_tokenized_path)
         metadata, new_metadata = self.tokenized_data[-1], []
         for curr_metadata in metadata:
             new_metadata.append((curr_metadata[0][0][0], curr_metadata[-1][-1][-1]))
@@ -637,6 +642,145 @@ class AmbigQAData(QAData):
                         if self.args.consider_order_for_multiple_answers and not _valid(_answers):
                             continue
                         answers = [bos_token_id, bos_token_id]
+                        for j, answer in enumerate(_answers):
+                            if j>0: answers.append(sep_token_id)
+                            answers += answer
+                        answers.append(eos_token_id)
+                        answers = answers[:30]
+                        new_decoder_input_ids.append(
+                            answers + [pad_token_id for _ in range(30-len(answers))])
+                        new_decoder_attention_mask.append(
+                            [1 for _ in answers] + [0 for _ in range(30-len(answers))])
+                        cnt += 1
+                        if cnt==100:
+                            break
+                assert decoder_offset+cnt==len(new_decoder_input_ids)
+                if cnt==0:
+                    continue
+                new_metadata.append([decoder_offset, decoder_offset+cnt])
+
+            new_input_ids.append(input_ids[idx][:MAX_INPUT_LEN])
+            new_attention_mask.append(attention_mask[idx][:MAX_INPUT_LEN])
+
+        self.tokenized_data = [new_input_ids, new_attention_mask, new_decoder_input_ids,
+                               new_decoder_attention_mask, new_metadata]
+        with open(dpr_tokenized_path, "w") as f:
+            json.dump(self.tokenized_data, f)
+        self.logger.info("Finish saving tokenized DPR data")
+
+    def load_dpr_data_t5(self, dpr_retrieval_path, dpr_tokenized_path):
+
+        if self.is_training and self.args.consider_order_for_multiple_answers:
+            dpr_tokenized_path = dpr_tokenized_path.replace(".json", "_ordered.json")
+
+        self.logger.info(dpr_retrieval_path)
+        self.logger.info(dpr_tokenized_path)
+
+        if os.path.exists(dpr_tokenized_path):
+            self.logger.info("Loading DPR data from {}".format(dpr_tokenized_path))
+            with open(dpr_tokenized_path, "r") as f:
+                self.tokenized_data = json.load(f)
+            return
+
+        import itertools
+        self.logger.info("Start processing DPR data from {}".format(dpr_retrieval_path))
+        if self.passages.tokenized_data is None:
+            self.passages.load_tokenized_data("t5", all=True)
+
+        with open(dpr_retrieval_path.format(self.data_type).replace("train", "train_for_inference"), "r") as f:
+            dpr_passages = json.load(f)
+        assert self.args.psg_sel_dir is not None
+
+        psg_sel_fn = os.path.join(self.args.psg_sel_dir,
+                                      "{}{}_psg_sel.json".format(
+                                          self.data_type.replace("train", "train_for_inference"),
+                                          "_20200201" if self.args.wiki_2020 else ""))
+        self.logger.info("Loading passage selection from DPR reader: {}".format(psg_sel_fn))
+        with open(psg_sel_fn, "r") as f:
+            fg_passages = json.load(f)
+            assert len(fg_passages)==len(dpr_passages)
+            dpr_passages = [[psgs[i] for i in fg_psgs] for psgs, fg_psgs in zip(dpr_passages, fg_passages)]
+
+        # added to convert original DPR data to AmbigQA DPR data
+        dpr_passages = [dpr_passages[d["orig_idx"]] for d in self.data]
+
+        assert len(dpr_passages)==len(self)
+        input_ids, attention_mask, decoder_input_ids, decoder_attention_mask, metadata = self.tokenized_data
+        assert len(dpr_passages)==len(input_ids)==len(attention_mask)==len(metadata)
+        # bos_token_id = self.tokenizer.bos_token_id
+        eos_token_id = self.tokenizer.eos_token_id
+        pad_token_id = self.tokenizer.pad_token_id
+        sep_token_id = self.tokenizer.convert_tokens_to_ids(self.SEP)
+        assert type(eos_token_id)==type(sep_token_id)==int
+
+        def _get_tokenized_answer(idx):
+            tokens = decoder_input_ids[idx]
+            if 0 in decoder_attention_mask[idx]:
+                tokens = tokens[:decoder_attention_mask[idx].index(0)]
+            assert tokens[-1]==eos_token_id
+            return tokens[2:-1]
+
+        new_input_ids, new_attention_mask = [], []
+        if self.is_training:
+            new_decoder_input_ids, new_decoder_attention_mask, new_metadata = [], [], []
+        else:
+            new_decoder_input_ids, new_decoder_attention_mask, new_metadata = None, None, None
+        for idx, (curr_input_ids, curr_attention_mask, curr_metadata, dpr_ids) in enumerate(zip(
+                input_ids, attention_mask, metadata, dpr_passages)):
+
+            dpr_input_ids = [self.passages.tokenized_data["input_ids"][_id] for _id in dpr_ids]
+            dpr_attention_mask = [self.passages.tokenized_data["attention_mask"][_id] for _id in dpr_ids]
+
+            # creating input_ids is done in the same way as NQ-open.
+            offset = 0
+            end_of_question = curr_input_ids.index(eos_token_id)+1
+            input_ids[idx] = curr_input_ids[:end_of_question]
+            attention_mask[idx] = curr_attention_mask[:end_of_question]
+            while len(input_ids[idx])<MAX_INPUT_LEN:
+                assert len(dpr_input_ids[offset])==len(dpr_attention_mask[offset])
+                assert np.sum(dpr_attention_mask[offset])==len(dpr_attention_mask[offset])
+                input_ids[idx] += dpr_input_ids[offset][1:]
+                attention_mask[idx] += dpr_attention_mask[offset][1:]
+                offset += 1
+
+            if self.is_training:
+                # now, re-creating decoder_input_ids and metadata
+                def _included(tokens):
+                    for i in range(end_of_question, MAX_INPUT_LEN-len(tokens)+1):
+                        if input_ids[idx][i:i+len(tokens)]==tokens:
+                            return True
+                    return False
+                def _valid(tokens_list):
+                    offset = 0
+                    for i in range(end_of_question, MAX_INPUT_LEN):
+                        if input_ids[idx][i:i+len(tokens_list[offset])]==tokens_list[offset]:
+                            offset += 1
+                            if offset==len(tokens_list):
+                                return True
+                    return False
+
+                for _curr_metadata in curr_metadata:
+                    found_answers = []
+                    for start, end in _curr_metadata:
+                        _answers = []
+                        for j in range(start, end):
+                            answer = _get_tokenized_answer(j)
+                            if not _included(answer): continue
+                            if answer in _answers: continue
+                            _answers.append(answer)
+                        if len(_answers)>0:
+                            found_answers.append(_answers)
+
+                    if len(found_answers)==0:
+                        continue
+
+                    decoder_offset = len(new_decoder_input_ids)
+                    cnt = 0
+                    for _answers in itertools.product(*found_answers):
+                        _answers = list(_answers)
+                        if self.args.consider_order_for_multiple_answers and not _valid(_answers):
+                            continue
+                        answers = []
                         for j, answer in enumerate(_answers):
                             if j>0: answers.append(sep_token_id)
                             answers += answer

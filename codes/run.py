@@ -135,8 +135,6 @@ def train(args, logger, model, train_data, dev_data, optimizer, scheduler):
         for batch in train_data.dataloader:
             global_step += 1
             batch = [b.to(torch.device("cuda")) for b in batch]
-            print("=============== Next batch of epoch", epoch, "===============")
-            print(batch)
             if args.is_seq2seq:
                 loss = model(input_ids=batch[0], attention_mask=batch[1],
                              decoder_input_ids=batch[2], decoder_attention_mask=batch[3],
@@ -272,7 +270,7 @@ def inference_dpr(model, dev_data, save_predictions):
 
 def inference_seq2seq(model, dev_data, save_predictions=False):
     predictions = []
-    bos_token_id = dev_data.tokenizer.bos_token_id
+    # bos_token_id = dev_data.tokenizer.bos_token_id
     if dev_data.args.task=="qa":
         max_answer_length = dev_data.args.max_answer_length
         assert max_answer_length>=25 or not dev_data.args.ambigqa
