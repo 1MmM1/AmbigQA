@@ -111,9 +111,9 @@ class QAData(object):
     def load_tokenized_data(self, tokenizer):
         self.tokenizer = tokenizer
         postfix = tokenizer.__class__.__name__.replace("zer", "zed")
-        assert "Bart" in postfix or "Bert" in postfix or "Albert" in postfix
-        assert ("Bart" in postfix and self.args.append_another_bos) \
-            or ("Bart" not in postfix and not self.args.append_another_bos)
+        assert "Bart" in postfix or "Bert" in postfix or "Albert" in postfix or "T5" in postfix
+        assert ("Bart" in postfix or "T5" in postfix and self.args.append_another_bos) \
+            or ("Bart" not in postfix or "T5" not in postfix and not self.args.append_another_bos)
         preprocessed_path = os.path.join(
             "/".join(self.data_path.split("/")[:-1]),
             self.data_path.split("/")[-1].replace(
@@ -142,7 +142,7 @@ class QAData(object):
                                                          pad_to_max_length=True,
                                                          max_length=32)
             answer_input = tokenizer.batch_encode_plus(answers,
-                                                       pad_to_max_length="Bart" in postfix,
+                                                       pad_to_max_length="Bart" in postfix or "T5" in postfix,
                                                        max_length=20)
             input_ids, attention_mask = question_input["input_ids"], question_input["attention_mask"]
             decoder_input_ids, decoder_attention_mask = answer_input["input_ids"], answer_input["attention_mask"]
@@ -239,6 +239,76 @@ class QAData(object):
 
         if self.is_training and self.args.discard_not_found_answers:
             self.discard_not_found_answers()
+
+    def load_dpr_data_t5(self, dpr_retrieval_path, dpr_tokenized_path):
+        self.logger.info("{}\n{}".format(dpr_retrieval_path, dpr_tokenized_path))
+        if os.path.exists(dpr_tokenized_path):
+            self.logger.info("Loading DPR data from {}".format(dpr_tokenized_path))
+            with open(dpr_tokenized_path, "r") as f:
+                input_ids, attention_mask = json.load(f)
+        else:
+            with open(dpr_retrieval_path, "r") as f:
+                dpr_passages = json.load(f)
+                assert len(dpr_passages)==len(self)
+            assert self.args.psg_sel_dir is not None
+            data_type = self.data_type.replace("train", "train_for_inference") \
+                if "for_inference" not in self.data_type else self.data_type
+            psg_sel_fn = os.path.join(self.args.psg_sel_dir,
+                                      "{}{}_psg_sel.json".format(
+                                          data_type,
+                                          "_20200201" if self.args.wiki_2020 else ""))
+            self.logger.info("Loading passage selection from DPR reader: {}".format(psg_sel_fn))
+            with open(psg_sel_fn, "r") as f:
+                fg_passages = json.load(f)
+                assert len(fg_passages)==len(dpr_passages)
+                fg_passages = dpr_passages
+
+            self.logger.info("Start processing DPR data")
+            if self.passages.tokenized_data is None:
+                subset = set([p_idx for retrieved in dpr_passages for p_idx in retrieved])
+                self.passages.load_tokenized_data("bart", subset=subset, all=True)
+
+            input_ids, attention_mask, decoder_input_ids, decoder_attention_mask, metadata = self.tokenized_data
+            assert len(dpr_passages)==len(input_ids)==len(attention_mask)
+            bos_token_id = self.tokenizer.bos_token_id
+
+            def _get_tokenized_answer(idx):
+                tokens = decoder_input_ids[idx]
+                if 0 in decoder_attention_mask[idx]:
+                    tokens = tokens[:decoder_attention_mask[idx].index(0)]
+                assert tokens[0]==tokens[1]==bos_token_id and tokens[-1]==self.tokenizer.eos_token_id
+                return tokens[2:-1]
+
+            for idx, (curr_input_ids, curr_attention_mask, curr_metadata, dpr_ids) in enumerate(zip(
+                    input_ids, attention_mask, metadata, dpr_passages)):
+                dpr_input_ids = [self.passages.tokenized_data["input_ids"][_id] for _id in dpr_ids]
+                dpr_attention_mask = [self.passages.tokenized_data["attention_mask"][_id] for _id in dpr_ids]
+                offset = 0
+                end_of_question = curr_input_ids.index(self.tokenizer.eos_token_id)+1
+                input_ids[idx] = curr_input_ids[:end_of_question]
+                attention_mask[idx] = curr_attention_mask[:end_of_question]
+
+                while len(input_ids[idx])<MAX_INPUT_LEN:
+                    assert dpr_input_ids[offset][0] == bos_token_id
+                    assert len(dpr_input_ids[offset])==len(dpr_attention_mask[offset])
+                    assert np.sum(dpr_attention_mask[offset])==len(dpr_attention_mask[offset])
+                    input_ids[idx] += dpr_input_ids[offset][1:]
+                    attention_mask[idx] += dpr_attention_mask[offset][1:]
+                    offset += 1
+                assert len(input_ids)==len(attention_mask)
+                input_ids[idx] = input_ids[idx][:MAX_INPUT_LEN]
+                attention_mask[idx] = attention_mask[idx][:MAX_INPUT_LEN]
+
+            with open(dpr_tokenized_path, "w") as f:
+                json.dump([input_ids, attention_mask], f)
+            self.logger.info("Finish saving tokenized DPR data at {}".format(dpr_tokenized_path))
+
+        self.tokenized_data[0] = input_ids
+        self.tokenized_data[1] = attention_mask
+
+        if self.is_training and self.args.discard_not_found_answers:
+            self.discard_not_found_answers()
+
 
     def discard_not_found_answers(self):
         input_ids, attention_mask, decoder_input_ids, decoder_attention_mask, metadata = self.tokenized_data

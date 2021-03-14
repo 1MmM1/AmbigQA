@@ -47,6 +47,8 @@ class PassageData(object):
                 cache_path = self.data_path.replace(".tsv.gz", "_{}_AlbertTokenized.pkl".format(index))
             elif model_name=="bart":
                 cache_path = self.data_path.replace(".tsv.gz", "_{}_BartTokenized.pkl".format(index))
+            elif model_name=="t5":
+                cache_path = self.data_path.replace(".tsv.gz", "_{}_T5Tokenized.pkl".format(index))
             else:
                 raise NotImplementedError(model_name)
             return cache_path
@@ -57,7 +59,7 @@ class PassageData(object):
                 self.load_db(subset)
             final_tokenized_data = {"input_ids": {}, "attention_mask": {}}
             psg_ids = list(subset)
-            input_data = [self.titles[_id] + " " + self.tokenizer.sep_token + " " + self.passages[_id]
+            input_data = [self.titles[_id] + " " + "<\s>" + " " + self.passages[_id]
                           for _id in psg_ids]
             tokenized_data = self.tokenizer.batch_encode_plus(input_data,
                         max_length=128,
