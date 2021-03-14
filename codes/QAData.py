@@ -266,7 +266,7 @@ class QAData(object):
             self.logger.info("Start processing DPR data")
             if self.passages.tokenized_data is None:
                 subset = set([p_idx for retrieved in dpr_passages for p_idx in retrieved])
-                self.passages.load_tokenized_data("bart", subset=subset, all=True)
+                self.passages.load_tokenized_data("t5", subset=subset, all=True)
 
             input_ids, attention_mask, decoder_input_ids, decoder_attention_mask, metadata = self.tokenized_data
             assert len(dpr_passages)==len(input_ids)==len(attention_mask)
@@ -289,7 +289,6 @@ class QAData(object):
                 attention_mask[idx] = curr_attention_mask[:end_of_question]
 
                 while len(input_ids[idx])<MAX_INPUT_LEN:
-                    assert dpr_input_ids[offset][0] == bos_token_id
                     assert len(dpr_input_ids[offset])==len(dpr_attention_mask[offset])
                     assert np.sum(dpr_attention_mask[offset])==len(dpr_attention_mask[offset])
                     input_ids[idx] += dpr_input_ids[offset][1:]
