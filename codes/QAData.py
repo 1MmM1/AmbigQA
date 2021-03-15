@@ -614,12 +614,7 @@ class AmbigQAData(QAData):
             return
 
         import itertools
-        self.logger.info("Start processing DPR data from {}".format(dpr_retrieval_path))
-        if self.passages.tokenized_data is None:
-            self.passages.load_tokenized_data("bart", all=True)
 
-        with open(dpr_retrieval_path.format(self.data_type).replace("train", "train_for_inference"), "r") as f:
-            dpr_passages = json.load(f)
         assert self.args.psg_sel_dir is not None
 
         psg_sel_fn = os.path.join(self.args.psg_sel_dir,
@@ -629,11 +624,15 @@ class AmbigQAData(QAData):
         self.logger.info("Loading passage selection from DPR reader: {}".format(psg_sel_fn))
         with open(psg_sel_fn, "r") as f:
             fg_passages = json.load(f)
+            dpr_passages = fg_passages
             assert len(fg_passages)==len(dpr_passages)
-            dpr_passages = [[psgs[i] for i in fg_psgs] for psgs, fg_psgs in zip(dpr_passages, fg_passages)]
+            
+            
+        self.logger.info("Start processing DPR data")
+        if self.passages.tokenized_data is None:
+            subset = set([p_idx for retrieved in dpr_passages for p_idx in retrieved])
+            self.passages.load_tokenized_data("bart", subset=subset, all=True)
 
-        # added to convert original DPR data to AmbigQA DPR data
-        dpr_passages = [dpr_passages[d["orig_idx"]] for d in self.data]
 
         assert len(dpr_passages)==len(self)
         input_ids, attention_mask, decoder_input_ids, decoder_attention_mask, metadata = self.tokenized_data
