@@ -38,7 +38,7 @@ Original content:
 5. [Interactive Demo for Question Answering](#interactive)
 6. [Pretrained model checkpoint](#need-preprocessed-data--pretrained-models--predictions)
 7. [Usage examples](#usage-examples)
-    * [Train only SpanSeqGen]()
+    * [Train only SpanSeqGen](#train-only-spanseqgen)
 
 ## Installation
 Tested with python 3.6.12 and let $ indicate bash commands.
