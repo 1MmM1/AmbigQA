@@ -4,71 +4,84 @@ import os
 import pathlib
 import wget
 
+SQUAD_RESOURCE_MAP = {
+   "train": "https://rajpurkar.github.io/SQuAD-explorer/dataset/train-v1.1.json",
+   "dev": "https://rajpurkar.github.io/SQuAD-explorer/dataset/dev-v1.1.json"
+}
+
+WQ_RESOURCE_MAP = {
+   "train": "https://raw.githubusercontent.com/brmson/dataset-factoid-webquestions/master/main/trainmodel.json",
+   "dev": "https://raw.githubusercontent.com/brmson/dataset-factoid-webquestions/master/main/val.json",
+   "test": "https://raw.githubusercontent.com/brmson/dataset-factoid-webquestions/master/main/test.json"
+}
+
 def download_squad(out_dir):
-   save_root, local_file = download_data(out_dir, "squad", "https://rajpurkar.github.io/SQuAD-explorer/dataset/train-v1.1.json")   
-   with open(local_file) as f:
-      data_raw = json.load(f)
+   for split, data_link in SQUAD_RESOURCE_MAP.items():
+      save_root, local_file = download_data(out_dir, "squad", split, data_link)   
+      with open(local_file) as f:
+         data_raw = json.load(f)
 
-   data_out = []
-   data_out_id2ans = {}
+      data_out = []
+      data_out_id2ans = {}
 
-   data = data_raw['data']
-   for d in data:
-      for p in d['paragraphs']:
-         for q in p['qas']:
-               qa_id = q['id']
-               answer_text = q['answers'][0]['text']
+      data = data_raw['data']
+      for d in data:
+         for p in d['paragraphs']:
+            for q in p['qas']:
+                  qa_id = q['id']
+                  answers =[answer['text'] for answer in q['answers']]
 
-               data_out_id2ans[qa_id] = [answer_text]
-               data_out.append({
-                  "id": qa_id,
-                  "question": q['question'],
-                  "answer": [answer_text]
-               })
+                  data_out_id2ans[qa_id] = answers
+                  data_out.append({
+                     "id": qa_id,
+                     "question": q['question'],
+                     "answer": answers
+                  })
 
-   out_file = open(os.path.join(save_root, "train.json"), "w")
-   json.dump(data_out, out_file)
-   out_file.close()
+      out_file = open(os.path.join(save_root, split + ".json"), "w")
+      json.dump(data_out, out_file)
+      out_file.close()
 
-   out_file = open(os.path.join(save_root, "train_id2answers.json"), "w")
-   json.dump(data_out_id2ans, out_file)
-   out_file.close()
+      out_file = open(os.path.join(save_root, split + "_id2answers.json"), "w")
+      json.dump(data_out_id2ans, out_file)
+      out_file.close()
 
 def download_wq(out_dir):
-   save_root, local_file = download_data(out_dir, "wq", "https://raw.githubusercontent.com/brmson/dataset-factoid-webquestions/master/main/trainmodel.json")   
+   for split, data_link in WQ_RESOURCE_MAP.items():
+      save_root, local_file = download_data(out_dir, "wq", split, data_link)   
 
-   with open(local_file) as f:
-      data_raw = json.load(f)
+      with open(local_file) as f:
+         data_raw = json.load(f)
 
-   data_out = []
-   data_out_id2ans = {}
+      data_out = []
+      data_out_id2ans = {}
 
-   for d in data_raw:
-      qa_id = str(ord(d["qId"][0])) + str(ord(d["qId"][1])) + str(ord(d["qId"][2])) + d["qId"][3:]
-      answer_text = d['answers']
+      for d in data_raw:
+         qa_id = str(ord(d["qId"][0])) + str(ord(d["qId"][1])) + str(ord(d["qId"][2])) + d["qId"][3:]
+         answer_text = d['answers']
 
-      data_out_id2ans[qa_id] = d['answers']
-      data_out.append({
-         "id": qa_id,
-         "question": d['qText'],
-         "answer": d['answers']
-      })
+         data_out_id2ans[qa_id] = d['answers']
+         data_out.append({
+            "id": qa_id,
+            "question": d['qText'],
+            "answer": d['answers']
+         })
 
-   out_file = open(os.path.join(save_root, "train.json"), "w")
-   json.dump(data_out, out_file)
-   out_file.close()
+      out_file = open(os.path.join(save_root, split + ".json"), "w")
+      json.dump(data_out, out_file)
+      out_file.close()
 
-   out_file = open(os.path.join(save_root, "train_id2answers.json"), "w")
-   json.dump(data_out_id2ans, out_file)
-   out_file.close()
+      out_file = open(os.path.join(save_root, split + "_id2answers.json"), "w")
+      json.dump(data_out_id2ans, out_file)
+      out_file.close()
 
-def download_data(out_dir, subdir, data_link):
+def download_data(out_dir, subdir, split, data_link):
    root_dir = out_dir if out_dir else './'
    save_root = os.path.join(root_dir, subdir)   
    pathlib.Path(save_root).mkdir(parents=True, exist_ok=True)
    print('Loading from ', data_link)
    
-   local_file = os.path.join(save_root, "train_data_raw.json")
+   local_file = os.path.join(save_root, split + "_data_raw.json")
    if os.path.exists(local_file):
       print('File already exist ', local_file)
       return
