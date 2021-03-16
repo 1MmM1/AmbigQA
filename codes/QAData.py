@@ -270,14 +270,13 @@ class QAData(object):
 
             input_ids, attention_mask, decoder_input_ids, decoder_attention_mask, metadata = self.tokenized_data
             assert len(dpr_passages)==len(input_ids)==len(attention_mask)
-            bos_token_id = self.tokenizer.bos_token_id
 
             def _get_tokenized_answer(idx):
                 tokens = decoder_input_ids[idx]
                 if 0 in decoder_attention_mask[idx]:
                     tokens = tokens[:decoder_attention_mask[idx].index(0)]
-                assert tokens[0]==tokens[1]==bos_token_id and tokens[-1]==self.tokenizer.eos_token_id
-                return tokens[2:-1]
+                assert tokens[-1]==self.tokenizer.eos_token_id
+                return tokens
 
             for idx, (curr_input_ids, curr_attention_mask, curr_metadata, dpr_ids) in enumerate(zip(
                     input_ids, attention_mask, metadata, dpr_passages)):
@@ -321,8 +320,17 @@ class QAData(object):
             tokens = self.tokenized_data[2][idx]
             if 0 in self.tokenized_data[3][idx]:
                 tokens = tokens[:self.tokenized_data[3][idx].index(0)]
+<<<<<<< HEAD
             assert tokens[-1]==self.tokenizer.eos_token_id
             return tokens[2:-1]
+=======
+            if "T5" in self.tokenizer.__class__.__name__.replace("zer", "zed"):
+                assert tokens[-1]==self.tokenizer.eos_token_id
+                return tokens
+            else:
+                assert tokens[0]==tokens[1]==self.tokenizer.bos_token_id and tokens[-1]==self.tokenizer.eos_token_id
+                return tokens[2:-1]
+>>>>>>> 4b20b1d36d14850ddf0895539b3967df5ba0ca23
 
         for idx, (curr_input_ids, curr_attention_mask, curr_metadata) in enumerate(zip(
                 input_ids, attention_mask, metadata)):
@@ -612,12 +620,7 @@ class AmbigQAData(QAData):
             return
 
         import itertools
-        self.logger.info("Start processing DPR data from {}".format(dpr_retrieval_path))
-        if self.passages.tokenized_data is None:
-            self.passages.load_tokenized_data("bart", all=True)
 
-        with open(dpr_retrieval_path.format(self.data_type).replace("train", "train_for_inference"), "r") as f:
-            dpr_passages = json.load(f)
         assert self.args.psg_sel_dir is not None
 
         psg_sel_fn = os.path.join(self.args.psg_sel_dir,
@@ -627,11 +630,15 @@ class AmbigQAData(QAData):
         self.logger.info("Loading passage selection from DPR reader: {}".format(psg_sel_fn))
         with open(psg_sel_fn, "r") as f:
             fg_passages = json.load(f)
+            dpr_passages = fg_passages
             assert len(fg_passages)==len(dpr_passages)
-            dpr_passages = [[psgs[i] for i in fg_psgs] for psgs, fg_psgs in zip(dpr_passages, fg_passages)]
+            
+            
+        self.logger.info("Start processing DPR data")
+        if self.passages.tokenized_data is None:
+            subset = set([p_idx for retrieved in dpr_passages for p_idx in retrieved])
+            self.passages.load_tokenized_data("bart", subset=subset, all=True)
 
-        # added to convert original DPR data to AmbigQA DPR data
-        dpr_passages = [dpr_passages[d["orig_idx"]] for d in self.data]
 
         assert len(dpr_passages)==len(self)
         input_ids, attention_mask, decoder_input_ids, decoder_attention_mask, metadata = self.tokenized_data
@@ -776,7 +783,6 @@ class AmbigQAData(QAData):
         assert len(dpr_passages)==len(self)
         input_ids, attention_mask, decoder_input_ids, decoder_attention_mask, metadata = self.tokenized_data
         assert len(dpr_passages)==len(input_ids)==len(attention_mask)==len(metadata)
-        # bos_token_id = self.tokenizer.bos_token_id
         eos_token_id = self.tokenizer.eos_token_id
         pad_token_id = self.tokenizer.pad_token_id
         sep_token_id = self.tokenizer.convert_tokens_to_ids(self.SEP)
