@@ -33,6 +33,7 @@ Original content:
     * [DPR Reader (Span Selection Model)](#dpr-reader-span-selection-model)
     * [SpanSeqGen (BART Reader)](#spanseqgen-bart-reader)
     * [Finetuning on AmbigQA](#finetuning-on-ambigqa)
+    * [Hyperparameter details / tuning](#hyperparameter-details--tuning)
 4. [Results](#results)
     * [Results with less resources](#results-with-less-resources)
 5. [Interactive Demo for Question Answering](#interactive)
@@ -46,11 +47,6 @@ Tested with python 3.6.12 and let $ indicate bash commands.
 $ pip install torch==1.1.0
 $ pip install git+https://github.com/huggingface/transformers.git@7b75aa9fa55bee577e2c7403301ed31103125a35
 $ pip install wget
-```
-
-Also, move `pycocoevalcap` to current directory
-```
-mv ../pycocoevalcap pycocoevalcap
 ```
 
 ## Download data
@@ -202,11 +198,16 @@ $ python3 cli.py --do_train --task qa --output_dir out/ambignq-span-seq-gen \
     --eval_period 500 --wait_step 10 --ambigqa --wiki_2020 --max_answer_length 25
 ```
 
-## Hyperparameter details
+## Hyperparameter details / tuning
 
 **On NQ-open:** For BERT-base, we use `train_batch_size=32, train_M=32` (w/ eight 32GB gpus). For BERT-large, we use `train_batch_size=8, train_M=16` (w/ four 32GB gpus). For BART, we use `train_batch_size=24` (w/ four 32GB gpus). For others, we use default hyperparameters.
 
 **On AmbigQA:** We use `train_batch_size=8` for BERT-base and `train_batch_size=24` for BART. We use `learning_rate=5e-6` for both.
+
+To do hyperparameter tuning, simply run the included bash script as shown below. This will try several values for beam size (1, 2, 6, 10, and 12), length penalty (1, 3, 5, and 10), and no repeat ngram (0, 1, 2, 3). To try different values, please edit the `beams`, `penaltys`, and `ngrams` variables in `run_inference_hyper.sh`.
+```
+$ ./run_inference_hyper.sh
+```
 
 ## Results
 
@@ -336,7 +337,6 @@ $ pip install wget
 # Clone git repository
 $ git clone git@github.com:1MmM1/AmbigQA.git
 $ cd AmbigQA/codes
-$ mv ../pycocoevalcap pycocoevalcap
 
 # Download data
 $ mkdir dpr_data_dir
@@ -387,5 +387,8 @@ $ python3 cli.py --do_train --task qa --output_dir out/ambignq-span-seq-gen \
     --discard_not_found_answers \
     --train_batch_size 2 --predict_batch_size 2 \
     --eval_period 500 --wait_step 10 --ambigqa --wiki_2020 --max_answer_length 25
+
+# Do hyperparameter tuning
+$ ./run_inference_hyper.sh
 ```
 
