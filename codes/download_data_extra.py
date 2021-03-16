@@ -18,7 +18,10 @@ WQ_RESOURCE_MAP = {
 def download_squad(out_dir):
    curr_id = 1
    for split, data_link in SQUAD_RESOURCE_MAP.items():
-      save_root, local_file = download_data(out_dir, "squad", split, data_link)   
+      save_root, local_file = download_data(out_dir, "squad", split, data_link)
+      if not local_file:
+         continue
+      
       with open(local_file) as f:
          data_raw = json.load(f)
 
@@ -51,12 +54,15 @@ def download_squad(out_dir):
       out_file.close()
 
       out_file = open(os.path.join(save_root, split + "_passages.json"), "w")
-      json.dump(passages, out_file)
+      for passage in passages:
+         out_file.write(str(passage[0]) + "\t" + passage[1] + "\t" + passage[2] + "\n")
       out_file.close()
 
 def download_wq(out_dir):
    for split, data_link in WQ_RESOURCE_MAP.items():
-      save_root, local_file = download_data(out_dir, "wq", split, data_link)   
+      save_root, local_file = download_data(out_dir, "wq", split, data_link)
+      if not local_file:
+         continue
 
       with open(local_file) as f:
          data_raw = json.load(f)
@@ -91,11 +97,11 @@ def download_data(out_dir, subdir, split, data_link):
    
    local_file = os.path.join(save_root, split + "_data_raw.json")
    if os.path.exists(local_file):
-      print('File already exist ', local_file)
-      return
-
-   wget.download(data_link, local_file)
-   print('\nSaved to', local_file)
+      print('File already exists: ', local_file)
+      local_file = None
+   else:
+      wget.download(data_link, local_file)
+      print('\nSaved to', local_file)
    return save_root, local_file
 
 def main():
