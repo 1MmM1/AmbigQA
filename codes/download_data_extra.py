@@ -16,6 +16,7 @@ WQ_RESOURCE_MAP = {
 }
 
 def download_squad(out_dir):
+   curr_id = 1
    for split, data_link in SQUAD_RESOURCE_MAP.items():
       save_root, local_file = download_data(out_dir, "squad", split, data_link)   
       with open(local_file) as f:
@@ -23,10 +24,13 @@ def download_squad(out_dir):
 
       data_out = []
       data_out_id2ans = {}
+      passages = []
 
       data = data_raw['data']
       for d in data:
          for p in d['paragraphs']:
+            passages.append([curr_id, p["context"], d["title"]])
+            curr_id += 1
             for q in p['qas']:
                   qa_id = q['id']
                   answers =[answer['text'] for answer in q['answers']]
@@ -44,6 +48,10 @@ def download_squad(out_dir):
 
       out_file = open(os.path.join(save_root, split + "_id2answers.json"), "w")
       json.dump(data_out_id2ans, out_file)
+      out_file.close()
+
+      out_file = open(os.path.join(save_root, split + "_passages.json"), "w")
+      json.dump(passages, out_file)
       out_file.close()
 
 def download_wq(out_dir):
