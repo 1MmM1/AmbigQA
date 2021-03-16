@@ -321,8 +321,7 @@ class QAData(object):
             tokens = self.tokenized_data[2][idx]
             if 0 in self.tokenized_data[3][idx]:
                 tokens = tokens[:self.tokenized_data[3][idx].index(0)]
-            if "T5" not in self.tokenizer.__class__.__name__.replace("zer", "zed"):
-                assert tokens[0]==tokens[1]==self.tokenizer.bos_token_id and tokens[-1]==self.tokenizer.eos_token_id
+            assert tokens[-1]==self.tokenizer.eos_token_id
             return tokens[2:-1]
 
         for idx, (curr_input_ids, curr_attention_mask, curr_metadata) in enumerate(zip(
@@ -485,6 +484,7 @@ class QAData(object):
                                        test_M=self.args.test_M)
         else:
             input_ids, attention_mask, decoder_input_ids, decoder_attention_mask, metadata = self.tokenized_data
+            #print(len(input_ids),len(decoder_input_ids))
             self.dataset = MySimpleQADataset(input_ids,
                                              attention_mask,
                                              decoder_input_ids if self.is_training or self.args.nq_answer_as_prefix else None,
