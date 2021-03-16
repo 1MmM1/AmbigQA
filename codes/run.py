@@ -3,8 +3,8 @@ import numpy as np
 import torch
 
 from tqdm import tqdm
-from transformers import BartTokenizer, T5Tokenizer, AlbertTokenizer, BertTokenizer
-from transformers import BartConfig, T5Config, AlbertConfig, BertConfig
+from transformers import BartTokenizer, AlbertTokenizer, BertTokenizer
+from transformers import BartConfig, AlbertConfig, BertConfig
 from transformers import AdamW, get_linear_schedule_with_warmup
 
 from QAData import QAData, AmbigQAData
@@ -12,26 +12,19 @@ from QGData import QGData, AmbigQGData
 from PassageData import PassageData
 
 from models.span_predictor import SpanPredictor, AlbertSpanPredictor
-from models.seq2seq import MyBart, MyT5
+from models.seq2seq import MyBart
 from models.seq2seq_with_prefix import MyBartWithPrefix
 from models.biencoder import MyBiEncoder
 
 def run(args, logger):
 
     args.dpr = args.task=="dpr"
-    args.is_seq2seq = 'bart' in args.bert_name or 't5' in args.bert_name
+    args.is_seq2seq = 'bart' in args.bert_name
     if 'bart' in args.bert_name:
         tokenizer = BartTokenizer.from_pretrained(args.bert_name)
         tokenizer.add_tokens(["<SEP>"])
         Model = MyBartWithPrefix if args.do_predict and args.nq_answer_as_prefix else MyBart
         Config = BartConfig
-        args.append_another_bos = True
-    elif 't5' in args.bert_name:
-        print("Using T5 model")
-        tokenizer = T5Tokenizer.from_pretrained(args.bert_name)
-        tokenizer.add_tokens(["<SEP>"])
-        Model = MyT5
-        Config = T5Config
         args.append_another_bos = True
     elif 'albert' in args.bert_name:
         tokenizer = AlbertTokenizer.from_pretrained(args.bert_name)
@@ -67,7 +60,7 @@ def run(args, logger):
             return {_convert(key):value for key, value in state_dict.items()}
         state_dict = convert_to_single_gpu(torch.load(checkpoint))
         model = Model(Config.from_pretrained(args.bert_name))
-        if "bart" in args.bert_name or "t5" in args.bert_name:
+        if "bart" in args.bert_name:
             model.resize_token_embeddings(len(tokenizer))
         logger.info("Loading from {}".format(checkpoint))
         return model.from_pretrained(None, config=model.config, state_dict=state_dict)
@@ -90,11 +83,12 @@ def run(args, logger):
         if args.checkpoint is not None:
             model = _load_from_checkpoint(args.checkpoint)
         else:
-            model = Model.from_pretrained(args.bert_name)
-        if "bart" in args.bert_name or "t5" in args.bert_name:
+            model = Model.from_pretrained("facebook/"+args.bert_name)
+        if "bart" in args.bert_name:
             model.resize_token_embeddings(len(tokenizer))
         if args.n_gpu>1:
             model = torch.nn.DataParallel(model)
+        #torch.cuda.empty_cache()
         model.to(torch.device("cuda"))
 
         no_decay = ['bias', 'LayerNorm.weight']
@@ -114,11 +108,12 @@ def run(args, logger):
         logger.info("Loading checkpoint from {}".format(checkpoint))
         if args.n_gpu>1 and 'bert' in args.bert_name:
             model = torch.nn.DataParallel(model)
+        #torch.cuda.empty_cache()
         model.to(torch.device("cuda"))
         model.eval()
         ems = inference(model, dev_data, save_predictions=True)
         logger.info("%s on test data = %.2f" % (dev_data.metric, np.mean(ems)*100))
-
+        print("EM on test data =", np.mean(ems)*100)
 def train(args, logger, model, train_data, dev_data, optimizer, scheduler):
     model.train()
     global_step = 0
@@ -136,9 +131,12 @@ def train(args, logger, model, train_data, dev_data, optimizer, scheduler):
             global_step += 1
             batch = [b.to(torch.device("cuda")) for b in batch]
             if args.is_seq2seq:
+                #for b1 in batch:
+                    #print("print:",b1.shape)
+                    #print(batch)
                 loss = model(input_ids=batch[0], attention_mask=batch[1],
-                             decoder_input_ids=batch[2], decoder_attention_mask=batch[3],
-                             is_training=True)
+                             decoder_input_ids=batch[2], decoder_attention_mask=batch[3], 
+			     is_training=True)
             else:
                 loss = model(input_ids=batch[0], attention_mask=batch[1], token_type_ids=batch[2],
                              start_positions=batch[3], end_positions=batch[4], answer_mask=batch[5],
@@ -149,6 +147,7 @@ def train(args, logger, model, train_data, dev_data, optimizer, scheduler):
                 logger.info("Stop training because loss=%s" % (loss.data))
                 stop_training=True
                 break
+            #torch.cuda.empty_cache()
             train_losses.append(loss.detach().cpu())
             loss.backward()
 
@@ -198,7 +197,7 @@ def train(args, logger, model, train_data, dev_data, optimizer, scheduler):
 def inference(model, dev_data, save_predictions=False):
     if dev_data.args.dpr:
         return inference_dpr(model, dev_data, save_predictions)
-    if "bart" in dev_data.args.bert_name or "t5" in dev_data.args.bert_name:
+    if "bart" in dev_data.args.bert_name:
         return inference_seq2seq(model if dev_data.args.n_gpu==1 or dev_data.args.do_predict else model.module, dev_data, save_predictions)
     return inference_span_predictor(model, dev_data, save_predictions)
 
@@ -239,7 +238,7 @@ def inference_dpr(model, dev_data, save_predictions):
                     pvec = np.concatenate([pvec, np.load(pvec_path)], axis=0)
         else:
             pvec_path = checkpoint[:checkpoint.index(".")] + ".psgs_w100{}_{}.npy".format(postfix, index)
-            print (pvec_path)
+            #print (pvec_path)
             if os.path.exists(pvec_path):
                 pvec = np.load(pvec_path)
             else:
@@ -270,7 +269,7 @@ def inference_dpr(model, dev_data, save_predictions):
 
 def inference_seq2seq(model, dev_data, save_predictions=False):
     predictions = []
-    # bos_token_id = dev_data.tokenizer.bos_token_id
+    bos_token_id = dev_data.tokenizer.bos_token_id
     if dev_data.args.task=="qa":
         max_answer_length = dev_data.args.max_answer_length
         assert max_answer_length>=25 or not dev_data.args.ambigqa
@@ -283,14 +282,22 @@ def inference_seq2seq(model, dev_data, save_predictions=False):
             decoder_start_token_id = None if not dev_data.args.nq_answer_as_prefix else \
                 [[model.config.decoder_start_token_id] + tokens[:min(max_answer_length-2, tokens.index(dev_data.tokenizer.eos_token_id))] for tokens in batch[2].tolist()]
             batch = [b.to(torch.device("cuda")) for b in batch[:2]]
+            #print("before generate")
+            #print("num_beams:", dev_data.args.num_beams)
+            #print("length_penalty:", dev_data.args.length_penalty)
+            #print("no_repeat_ngram_size:", dev_data.args.no_repeat_ngram_size)
+
             outputs = model.generate(input_ids=batch[0],
                                      attention_mask=batch[1],
-                                     num_beams=4,
+                                     num_beams=dev_data.args.num_beams,
                                      max_length=max_answer_length,
+                                     no_repeat_ngram_size=dev_data.args.no_repeat_ngram_size,
+                                     length_penalty=dev_data.args.length_penalty,
                                      early_stopping=True,
                                      decoder_start_token_id=decoder_start_token_id,
-                                     num_return_sequences=4 if decoder_start_token_id is not None else 1
+                                     num_return_sequences=4 if decoder_start_token_id is not None else 1,
                                      )
+            #print("run")
             for input_, output in zip(batch[0], outputs):
                 predictions.append(dev_data.decode(output))
     if save_predictions:

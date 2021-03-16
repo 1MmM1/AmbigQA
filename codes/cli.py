@@ -21,12 +21,15 @@ import os
 import sys
 import argparse
 import logging
+import time
 
 import random
 import numpy as np
 import torch
 
 from run import run
+
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -156,6 +159,11 @@ def main():
                              "See details at https://nvidia.github.io/apex/amp.html")
     parser.add_argument('--server_ip', type=str, default='', help="Can be used for distant debugging.")
     parser.add_argument('--server_port', type=str, default='', help="Can be used for distant debugging.")
+    parser.add_argument('--num_beams', type=int, default=4, help="Can be used for number of beams for generation.")
+    parser.add_argument('--length_penalty', type=int, default=1, help="Can be used for penalty the length for generation.")
+    parser.add_argument('--no_repeat_ngram_size', type=int, default=0, help="Can be used for number of beams for generation.")
+
+
     args = parser.parse_args()
     if os.path.exists(args.output_dir) and os.listdir(args.output_dir):
         print("Output directory () already exists and is not empty.")
@@ -207,4 +215,9 @@ def main():
     run(args, logger)
 
 if __name__=='__main__':
+    start=time.time()
     main()
+    end=time.time()-start
+    
+    if args.do_predict:
+        print("total time for inference:", end)
