@@ -17,17 +17,23 @@ print("Processing", data_path, "...")
 data = []
 # passages = {}
 # titles = {}
-
+line_index = 0
 if data_path[-3:] == ".gz":
    with gzip.open(data_path, "rb") as f:
       _ = f.readline()
       for line in f:
          data.append(line.decode().strip().split("\t"))
+         if line_index % LOG_INTERVAL == 0:
+            print("Currently at line", line_index)
+         line_index += 1
 else:
    with open(data_path, "r") as f:
       _ = f.readline()
       for line in f:
          data.append(line.strip().split("\t"))
+         if line_index % LOG_INTERVAL == 0:
+            print("Currently at line", line_index)
+         line_index += 1
 print("Finished processing file.")
 
 data = np.asarray(data, dtype=str)
