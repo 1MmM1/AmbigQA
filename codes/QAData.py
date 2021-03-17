@@ -18,7 +18,7 @@ from util import decode_span_batch
 from ambigqa_evaluate_script import normalize_answer, get_exact_match, get_f1, get_qg_metrics
 from pycocoevalcap.bleu.bleu import Bleu
 
-MAX_INPUT_LEN = 700
+#MAX_INPUT_LEN = 700
 
 class QAData(object):
 
@@ -70,7 +70,8 @@ class QAData(object):
         self.dpr_tokenized_data = None
         self.dataset = None
         self.dataloader = None
-
+        self.MAX_INPUT_LEN = args.max_input_length
+        
     def __len__(self):
         return len(self.data)
 
@@ -188,16 +189,23 @@ class QAData(object):
                                       "{}{}_psg_sel.json".format(
                                           data_type,
                                           "_20200201" if self.args.wiki_2020 else ""))
-            self.logger.info("Loading passage selection from DPR reader: {}".format(psg_sel_fn))
-            with open(psg_sel_fn, "r") as f:
-                fg_passages = json.load(f)
-                assert len(fg_passages)==len(dpr_passages)
-                fg_passages = dpr_passages
+
+            if not self.args.train_on_squad:
+                self.logger.info("Loading passage selection from DPR reader: {}".format(psg_sel_fn))
+                with open(psg_sel_fn, "r") as f:
+                    fg_passages = json.load(f)
+                    assert len(fg_passages)==len(dpr_passages)
+                    fg_passages = dpr_passages
 
             self.logger.info("Start processing DPR data")
-            if self.passages.tokenized_data is None:
+
+            if self.args.train_on_squad:
                 subset = set([p_idx for retrieved in dpr_passages for p_idx in retrieved])
                 self.passages.load_tokenized_data("bart", subset=subset, all=True)
+            else:
+                if self.passages.tokenized_data is None:
+                    subset = set([p_idx for retrieved in dpr_passages for p_idx in retrieved])
+                    self.passages.load_tokenized_data("bart", subset=subset, all=True)
 
             input_ids, attention_mask, decoder_input_ids, decoder_attention_mask, metadata = self.tokenized_data
             assert len(dpr_passages)==len(input_ids)==len(attention_mask)
@@ -217,18 +225,41 @@ class QAData(object):
                 offset = 0
                 end_of_question = curr_input_ids.index(self.tokenizer.eos_token_id)+1
                 input_ids[idx] = curr_input_ids[:end_of_question]
+
+                if self.args.train_on_squad:
+                    if len(input_ids[idx])<self.MAX_INPUT_LEN:
+                        for i in range(self.MAX_INPUT_LEN-len(input_ids[idx])):
+                            input_ids[idx].append(0)
+
                 attention_mask[idx] = curr_attention_mask[:end_of_question]
 
-                while len(input_ids[idx])<MAX_INPUT_LEN:
+                if self.args.train_on_squad:
+                    if len(attention_mask[idx])<self.MAX_INPUT_LEN:
+                        for i in range(self.MAX_INPUT_LEN-len(attention_mask[idx])):
+                            attention_mask[idx].append(0)
+
+            if self.args.train_on_squad:
+                while len(input_ids[idx])<self.MAX_INPUT_LEN:
+                    #print(offset)                                                                                                                                                     
                     assert dpr_input_ids[offset][0] == bos_token_id
                     assert len(dpr_input_ids[offset])==len(dpr_attention_mask[offset])
                     assert np.sum(dpr_attention_mask[offset])==len(dpr_attention_mask[offset])
                     input_ids[idx] += dpr_input_ids[offset][1:]
                     attention_mask[idx] += dpr_attention_mask[offset][1:]
                     offset += 1
-                assert len(input_ids)==len(attention_mask)
-                input_ids[idx] = input_ids[idx][:MAX_INPUT_LEN]
-                attention_mask[idx] = attention_mask[idx][:MAX_INPUT_LEN]
+                    if offset>0:
+                        break;
+            else:
+                while len(input_ids[idx])<self.MAX_INPUT_LEN:
+                    assert dpr_input_ids[offset][0] == bos_token_id
+                    assert len(dpr_input_ids[offset])==len(dpr_attention_mask[offset])
+                    assert np.sum(dpr_attention_mask[offset])==len(dpr_attention_mask[offset])
+                    input_ids[idx] += dpr_input_ids[offset][1:]
+                    attention_mask[idx] += dpr_attention_mask[offset][1:]
+                    offset += 1
+            assert len(input_ids)==len(attention_mask)
+            input_ids[idx] = input_ids[idx][:self.MAX_INPUT_LEN]
+            attention_mask[idx] = attention_mask[idx][:self.MAX_INPUT_LEN]
 
             with open(dpr_tokenized_path, "w") as f:
                 json.dump([input_ids, attention_mask], f)
@@ -287,15 +318,15 @@ class QAData(object):
                 input_ids[idx] = curr_input_ids[:end_of_question]
                 attention_mask[idx] = curr_attention_mask[:end_of_question]
 
-                while len(input_ids[idx])<MAX_INPUT_LEN:
+                while len(input_ids[idx])<self.MAX_INPUT_LEN:
                     assert len(dpr_input_ids[offset])==len(dpr_attention_mask[offset])
                     assert np.sum(dpr_attention_mask[offset])==len(dpr_attention_mask[offset])
                     input_ids[idx] += dpr_input_ids[offset][1:]
                     attention_mask[idx] += dpr_attention_mask[offset][1:]
                     offset += 1
                 assert len(input_ids)==len(attention_mask)
-                input_ids[idx] = input_ids[idx][:MAX_INPUT_LEN]
-                attention_mask[idx] = attention_mask[idx][:MAX_INPUT_LEN]
+                input_ids[idx] = input_ids[idx][:self.MAX_INPUT_LEN]
+                attention_mask[idx] = attention_mask[idx][:self.MAX_INPUT_LEN]
 
             with open(dpr_tokenized_path, "w") as f:
                 json.dump([input_ids, attention_mask], f)
@@ -331,13 +362,22 @@ class QAData(object):
                 input_ids, attention_mask, metadata)):
             end_of_question = curr_input_ids.index(self.tokenizer.eos_token_id)+1
             def _included(tokens):
-                for i in range(end_of_question, MAX_INPUT_LEN-len(tokens)+1):
+                for i in range(end_of_question, self.MAX_INPUT_LEN-len(tokens)+1):
                     if curr_input_ids[i:i+len(tokens)]==tokens:
                         return True
                 return False
 
+            def train_squad(tokens): 
+                if self.args.train_on_squad:
+                    return not _included(_get_tokenized_answer(tokens))
+                else:
+                    return _included(_get_tokenized_answer(tokens))
             valid_answer_idxs = [answer_idx for answer_idx in range(curr_metadata[0], curr_metadata[1])
-                                    if _included(_get_tokenized_answer(answer_idx))]
+                                    if train_squad(answer_idx)]
+
+            #valid_answer_idxs = [answer_idx for answer_idx in range(curr_metadata[0], curr_metadata[1])
+            #                        if args.train_on_squad not _included(_get_tokenized_answer(answer_idx)) else _included(_get_tokenized_answer(answer_idx)) ]
+
             if len(valid_answer_idxs)==0:
                 skipped_idxs.append(idx)
                 continue
@@ -667,7 +707,7 @@ class AmbigQAData(QAData):
             end_of_question = curr_input_ids.index(eos_token_id)+1
             input_ids[idx] = curr_input_ids[:end_of_question]
             attention_mask[idx] = curr_attention_mask[:end_of_question]
-            while len(input_ids[idx])<MAX_INPUT_LEN:
+            while len(input_ids[idx])<self.MAX_INPUT_LEN:
                 assert dpr_input_ids[offset][0] == bos_token_id
                 assert len(dpr_input_ids[offset])==len(dpr_attention_mask[offset])
                 assert np.sum(dpr_attention_mask[offset])==len(dpr_attention_mask[offset])
@@ -678,13 +718,13 @@ class AmbigQAData(QAData):
             if self.is_training:
                 # now, re-creating decoder_input_ids and metadata
                 def _included(tokens):
-                    for i in range(end_of_question, MAX_INPUT_LEN-len(tokens)+1):
+                    for i in range(end_of_question, self.MAX_INPUT_LEN-len(tokens)+1):
                         if input_ids[idx][i:i+len(tokens)]==tokens:
                             return True
                     return False
                 def _valid(tokens_list):
                     offset = 0
-                    for i in range(end_of_question, MAX_INPUT_LEN):
+                    for i in range(end_of_question, self.MAX_INPUT_LEN):
                         if input_ids[idx][i:i+len(tokens_list[offset])]==tokens_list[offset]:
                             offset += 1
                             if offset==len(tokens_list):
@@ -730,8 +770,8 @@ class AmbigQAData(QAData):
                     continue
                 new_metadata.append([decoder_offset, decoder_offset+cnt])
 
-            new_input_ids.append(input_ids[idx][:MAX_INPUT_LEN])
-            new_attention_mask.append(attention_mask[idx][:MAX_INPUT_LEN])
+            new_input_ids.append(input_ids[idx][:self.MAX_INPUT_LEN])
+            new_attention_mask.append(attention_mask[idx][:self.MAX_INPUT_LEN])
 
         self.tokenized_data = [new_input_ids, new_attention_mask, new_decoder_input_ids,
                                new_decoder_attention_mask, new_metadata]
@@ -806,7 +846,7 @@ class AmbigQAData(QAData):
             end_of_question = curr_input_ids.index(eos_token_id)+1
             input_ids[idx] = curr_input_ids[:end_of_question]
             attention_mask[idx] = curr_attention_mask[:end_of_question]
-            while len(input_ids[idx])<MAX_INPUT_LEN:
+            while len(input_ids[idx])<self.MAX_INPUT_LEN:
                 assert len(dpr_input_ids[offset])==len(dpr_attention_mask[offset])
                 assert np.sum(dpr_attention_mask[offset])==len(dpr_attention_mask[offset])
                 input_ids[idx] += dpr_input_ids[offset][1:]
@@ -816,13 +856,13 @@ class AmbigQAData(QAData):
             if self.is_training:
                 # now, re-creating decoder_input_ids and metadata
                 def _included(tokens):
-                    for i in range(end_of_question, MAX_INPUT_LEN-len(tokens)+1):
+                    for i in range(end_of_question, self.MAX_INPUT_LEN-len(tokens)+1):
                         if input_ids[idx][i:i+len(tokens)]==tokens:
                             return True
                     return False
                 def _valid(tokens_list):
                     offset = 0
-                    for i in range(end_of_question, MAX_INPUT_LEN):
+                    for i in range(end_of_question, self.MAX_INPUT_LEN):
                         if input_ids[idx][i:i+len(tokens_list[offset])]==tokens_list[offset]:
                             offset += 1
                             if offset==len(tokens_list):
@@ -868,8 +908,8 @@ class AmbigQAData(QAData):
                     continue
                 new_metadata.append([decoder_offset, decoder_offset+cnt])
 
-            new_input_ids.append(input_ids[idx][:MAX_INPUT_LEN])
-            new_attention_mask.append(attention_mask[idx][:MAX_INPUT_LEN])
+            new_input_ids.append(input_ids[idx][:self.MAX_INPUT_LEN])
+            new_attention_mask.append(attention_mask[idx][:self.MAX_INPUT_LEN])
 
         self.tokenized_data = [new_input_ids, new_attention_mask, new_decoder_input_ids,
                                new_decoder_attention_mask, new_metadata]

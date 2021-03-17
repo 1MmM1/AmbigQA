@@ -161,7 +161,13 @@ def main():
     parser.add_argument('--server_port', type=str, default='', help="Can be used for distant debugging.")
     parser.add_argument('--num_beams', type=int, default=4, help="Can be used for number of beams for generation.")
     parser.add_argument('--length_penalty', type=int, default=1, help="Can be used for penalty the length for generation.")
-    parser.add_argument('--no_repeat_ngram_size', type=int, default=0, help="Can be used for number of beams for generation.")
+    parser.add_argument('--no_repeat_ngram_size', type=int, default=0, help="Can be used for changing the ngram size for generation.")
+    parser.add_argument('--max_input_length', type=int, default=700, help="Can be used for changing the max input length for tokenization.")
+
+    ## parameter for training on squad dataset
+    parser.add_argument('--train_on_squad', action='store_true',
+                        help="Whether to use for training on additional dataset(SQuad)")
+    
 
 
     args = parser.parse_args()
