@@ -74,6 +74,27 @@ def download_squad(out_dir,dpr_dir,dpr_data_dir):
    json.dump(pass_dict,out_file)
    out_file.close()
 
+   with open(os.path.join(save_root, "train.json"),"r") as f:
+         data= json.load(f)
+
+   split_list=[]
+   for d in data:
+      split_list.append(d)
+   index=int(len(split_list)*0.7)
+   train_new = split_list[:index]
+   test_new = split_list[index:]
+   print(len(train_new))
+   print(len(test_new))
+
+   out_file = open(os.path.join(save_root, "train.json"), "w")
+   json.dump(train_new,out_file)
+   out_file.close()
+
+   out_file = open(os.path.join(save_root, "test.json"), "w")
+   json.dump(test_new,out_file)
+   out_file.close()
+
+         
    for i in ["train","dev"]:
       with open(os.path.join(save_root, i + ".json"),"r") as f:
          data= json.load(f)
