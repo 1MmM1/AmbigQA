@@ -1,6 +1,7 @@
 import os
 import pickle as pkl
 import gzip
+import json
 import numpy as np
 from collections import defaultdict
 
@@ -14,9 +15,13 @@ class PassageData(object):
     def __init__(self, logger, args, tokenizer):
         self.logger = logger
         self.args = args
-        self.data_path = os.path.join(args.dpr_data_dir,
+        if self.args.train_on_squad:
+            self.data_path = os.path.join(args.dpr_data_dir,"squad/passages.json")
+        else:
+            self.data_path = os.path.join(args.dpr_data_dir,
                                       "data/wikipedia_split/psgs_w100{}.tsv.gz".format("_20200201" if args.wiki_2020 else ""))
-
+            
+                                                                                       
         self.passages = None
         self.titles = None
         self.tokenizer = tokenizer
@@ -26,16 +31,29 @@ class PassageData(object):
         if not self.args.skip_db_load:
             self.passages = {}
             self.titles = {}
-            with gzip.open(self.data_path, "rb") as f:
-                _ = f.readline()
-                offset = 0
-                for line in f:
-                    if subset is None or offset in subset:
-                        _id, passage, title = line.decode().strip().split("\t")
-                        assert int(_id)-1==offset
-                        self.passages[offset] = passage.lower()
-                        self.titles[offset] = title.lower()
-                    offset += 1
+            if not self.args.train_on_squad:
+                with gzip.open(self.data_path, "rb") as f:
+                    _ = f.readline()
+                    offset = 0
+                    for line in f:
+                        if subset is None or offset in subset:
+                            _id, passage, title = line.decode().strip().split("\t")
+                            assert int(_id)-1==offset
+                            self.passages[offset] = passage.lower()
+                            self.titles[offset] = title.lower()
+                        offset += 1
+            else:
+                with open(self.data_path,"r") as f:
+                    pas = json.load(f)
+                    offset = 0
+                    for line in pas:
+                        if subset is None or (offset+1) in subset:                                                                                                                     
+                            _id, passage, title = line
+                            assert int(_id)-1==offset
+                            self.passages[offset+1] = passage.lower()
+                            self.titles[offset+1] = title.lower()                                                                                                               
+                        offset += 1
+
             assert subset is None or len(subset)==len(self.titles)==len(self.passages)
             self.logger.info("Loaded {} passages".format(len(self.passages)))
 
@@ -53,68 +71,91 @@ class PassageData(object):
                 raise NotImplementedError(model_name)
             return cache_path
 
-        if subset is not None and not os.path.exists(_get_cache_path(0)):
-            assert not self.args.skip_db_load
-            if self.titles is None or self.passages is None:
-                self.load_db(subset)
-            final_tokenized_data = {"input_ids": {}, "attention_mask": {}}
-            psg_ids = list(subset)
-            input_data = [self.titles[_id] + " " + "<\s>" + " " + self.passages[_id]
-                          for _id in psg_ids]
-            tokenized_data = self.tokenizer.batch_encode_plus(input_data,
-                        max_length=128,
-                        pad_to_max_length=model_name in ["albert", "bert"])
-            input_ids = {_id: _input_ids
-                         for _id, _input_ids in zip(psg_ids, tokenized_data["input_ids"])}
-            attention_mask = {_id: _attention_mask
-                              for _id, _attention_mask in zip(psg_ids, tokenized_data["attention_mask"])}
-            final_tokenized_data = {"input_ids": input_ids, "attention_mask": attention_mask}
-        elif all:
-            for index in range(10):
-                curr_tokenized_data = self.load_tokenized_data(model_name, all=False, do_return=True, subset=subset, index=index)
-                if index==0:
-                    tokenized_data = curr_tokenized_data
-                elif subset is None:
-                    tokenized_data["input_ids"] += curr_tokenized_data["input_ids"]
-                    tokenized_data["attention_mask"] += curr_tokenized_data["attention_mask"]
-                else:
-                    tokenized_data["input_ids"].update(curr_tokenized_data["input_ids"])
-                    tokenized_data["attention_mask"].update(curr_tokenized_data["attention_mask"])
-            final_tokenized_data = tokenized_data
+        if self.args.train_on_squad:
+            if subset is not None and os.path.exists(_get_cache_path(0)):
+                assert not self.args.skip_db_load
+                self.titles==None
+
+                if self.titles is None or self.passages is None:
+                    self.load_db(subset)
+                final_tokenized_data = {"input_ids": {}, "attention_mask": {}}
+                psg_ids = list(subset)
+
+                input_data = [self.titles[_id] + " " + self.tokenizer.sep_token + " " + self.passages[_id]
+                              for _id in psg_ids]
+                tokenized_data = self.tokenizer.batch_encode_plus(input_data,
+                            max_length=128,
+                            pad_to_max_length=model_name in ["albert", "bert"])
+                input_ids = {_id: _input_ids
+                             for _id, _input_ids in zip(psg_ids, tokenized_data["input_ids"])}
+                attention_mask = {_id: _attention_mask
+                                  for _id, _attention_mask in zip(psg_ids, tokenized_data["attention_mask"])}
+        
+                final_tokenized_data = {"input_ids": input_ids, "attention_mask": attention_mask}
+
         else:
-            index=self.args.db_index if index is None else index
-            assert 0<=index<10
-            cache_path = _get_cache_path(index)
-            if os.path.exists(cache_path):
-                with open(cache_path, "rb") as f:
-                    tokenized_data = pkl.load(f)
-            else:
+            if subset is not None and not os.path.exists(_get_cache_path(0)):
                 assert not self.args.skip_db_load
                 if self.titles is None or self.passages is None:
-                    self.load_db()
-                # tokenize 2.2M for each thread
-                min_idx = index*2200000
-                max_idx = min(len(self.titles), (index+1)*2200000)
-                self.logger.info("Start tokenizing from {} to {}".format(min_idx, max_idx))
-                input_data = [self.titles[_id] + " " + self.tokenizer.sep_token + " " + self.passages[_id]
-                            for _id in range(min_idx, max_idx)]
+                    self.load_db(subset)
+                final_tokenized_data = {"input_ids": {}, "attention_mask": {}}
+                psg_ids = list(subset)
+                input_data = [self.titles[_id] + " " + "<\s>" + " " + self.passages[_id]
+                              for _id in psg_ids]
                 tokenized_data = self.tokenizer.batch_encode_plus(input_data,
-                        max_length=128,
-                        pad_to_max_length=model_name in ["albert", "bert"])
-                with open(cache_path, "wb") as f:
-                    pkl.dump({"input_ids": tokenized_data["input_ids"],
-                              "attention_mask": tokenized_data["attention_mask"]}, f)
-
-            if subset is None:
+                            max_length=128,
+                            pad_to_max_length=model_name in ["albert", "bert"])
+                input_ids = {_id: _input_ids
+                             for _id, _input_ids in zip(psg_ids, tokenized_data["input_ids"])}
+                attention_mask = {_id: _attention_mask
+                                  for _id, _attention_mask in zip(psg_ids, tokenized_data["attention_mask"])}
+                final_tokenized_data = {"input_ids": input_ids, "attention_mask": attention_mask}
+            elif all:
+                for index in range(10):
+                    curr_tokenized_data = self.load_tokenized_data(model_name, all=False, do_return=True, subset=subset, index=index)
+                    if index==0:
+                        tokenized_data = curr_tokenized_data
+                    elif subset is None:
+                        tokenized_data["input_ids"] += curr_tokenized_data["input_ids"]
+                        tokenized_data["attention_mask"] += curr_tokenized_data["attention_mask"]
+                    else:
+                        tokenized_data["input_ids"].update(curr_tokenized_data["input_ids"])
+                        tokenized_data["attention_mask"].update(curr_tokenized_data["attention_mask"])
                 final_tokenized_data = tokenized_data
             else:
-                # only keep 2200000*i
-                start, end = 2200000*index, 2200000*(index+1)
-                final_tokenized_data = {"input_ids": {}, "attention_mask": {}}
-                for passage_idx in subset:
-                    if start<=passage_idx<end:
-                        final_tokenized_data["input_ids"][passage_idx] = tokenized_data["input_ids"][passage_idx-start]
-                        final_tokenized_data["attention_mask"][passage_idx] = tokenized_data["attention_mask"][passage_idx-start]
+                index=self.args.db_index if index is None else index
+                assert 0<=index<10
+                cache_path = _get_cache_path(index)
+                if os.path.exists(cache_path):
+                    with open(cache_path, "rb") as f:
+                        tokenized_data = pkl.load(f)
+                else:
+                    assert not self.args.skip_db_load
+                    if self.titles is None or self.passages is None:
+                        self.load_db()
+                    # tokenize 2.2M for each thread
+                    min_idx = index*2200000
+                    max_idx = min(len(self.titles), (index+1)*2200000)
+                    self.logger.info("Start tokenizing from {} to {}".format(min_idx, max_idx))
+                    input_data = [self.titles[_id] + " " + self.tokenizer.sep_token + " " + self.passages[_id]
+                                for _id in range(min_idx, max_idx)]
+                    tokenized_data = self.tokenizer.batch_encode_plus(input_data,
+                            max_length=128,
+                            pad_to_max_length=model_name in ["albert", "bert"])
+                    with open(cache_path, "wb") as f:
+                        pkl.dump({"input_ids": tokenized_data["input_ids"],
+                                  "attention_mask": tokenized_data["attention_mask"]}, f)
+        
+                if subset is None:
+                    final_tokenized_data = tokenized_data
+                else:
+                    # only keep 2200000*i
+                    start, end = 2200000*index, 2200000*(index+1)
+                    final_tokenized_data = {"input_ids": {}, "attention_mask": {}}
+                    for passage_idx in subset:
+                        if start<=passage_idx<end:
+                            final_tokenized_data["input_ids"][passage_idx] = tokenized_data["input_ids"][passage_idx-start]
+                            final_tokenized_data["attention_mask"][passage_idx] = tokenized_data["attention_mask"][passage_idx-start]
 
         self.logger.info("Finish loading {} {} tokenized data".format(len(final_tokenized_data["input_ids"]), model_name))
         if do_return:
