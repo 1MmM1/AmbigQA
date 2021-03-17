@@ -335,7 +335,7 @@ $ pip install git+https://github.com/huggingface/transformers.git@7b75aa9fa55bee
 $ pip install wget
 
 # Clone git repository
-$ git clone git@github.com:1MmM1/AmbigQA.git
+$ git clone https://github.com/1MmM1/AmbigQA.git
 $ cd AmbigQA/codes
 
 # Download data
