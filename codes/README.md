@@ -1,10 +1,8 @@
 # AmbigQA Baseline Models
 
-**Update as of 07/2020**: Codes for running DPR retrieval, DPR reader and BART reader (SpanSeqGen) on NQ-open and AmbigQA are ready. Stay tuned for Question Generation models!
+This repo contains multiple models for open-domain question answering. This code is based on the [original implementation](ambigqa-code) and uses [PyTorch][pytorch] and [HuggingFace Transformers][hf].
 
-This repo contains multiple models for open-domain question answering. This code is based on [PyTorch][pytorch] and [HuggingFace Transformers][hf].
-
-This is an original implementation of "Sewon Min, Julian Michael, Hannaneh Hajishirzi, Luke Zettlemoyer. [AmbigQA: Answering Ambiguous Open-domain Questions][ambigqa-paper]. 2020".
+This repository also builds off of the original implementation of "Sewon Min, Julian Michael, Hannaneh Hajishirzi, Luke Zettlemoyer. [AmbigQA: Answering Ambiguous Open-domain Questions][ambigqa-paper]. 2020". Please reference their [repository](ambigqa-code) and [website](ambigqa-website) for more information on the AmbigQA task and AmbigNQ dataset, and make sure to cite their paper if you find them useful.
 ```
 @article{ min2020ambigqa,
     title={ {A}mbig{QA}: Answering Ambiguous Open-domain Questions },
@@ -13,6 +11,15 @@ This is an original implementation of "Sewon Min, Julian Michael, Hannaneh Hajis
     year={2020}
 }
 ```
+
+Please also make sure to credit and cite the creators of Natural Questions, the dataset which AmbigNQ is built off of:
+
+@article{ kwiatkowski2019natural,
+  title={ Natural questions: a benchmark for question answering research},
+  author={ Kwiatkowski, Tom and Palomaki, Jennimaria and Redfield, Olivia and Collins, Michael and Parikh, Ankur and Alberti, Chris and Epstein, Danielle and Polosukhin, Illia and Devlin, Jacob and Lee, Kenton and others },
+  journal={ Transactions of the Association for Computational Linguistics },
+  year={ 2019 }
+}
 
 This also contains a re-implementation of "Vladimir Karpukhin*, Barlas Oguz*, Sewon Min, Patrick Lewis, Ledell Wu, Sergey Edunov, Danqi Chen, Wen-tau Yih. [Dense Passage Retrieval for Open-domain Question Answering. 2020][dpr-paper]", as part of AmbigQA models. The original implementation can be found [here][dpr-code]. This codebase achieves higher accuracy.
 ```
@@ -294,6 +301,8 @@ For a sanity check, the recall accuracy should be as follows. (For AmbigQA, macr
 Coming soon!
 
 [ambigqa-paper]: https://arxiv.org/abs/2004.10645
+[ambigqa-code]: https://github.com/shmsw25/AmbigQA
+[ambigqu-website]: https://nlp.cs.washington.edu/ambigqa
 [dpr-paper]: https://arxiv.org/abs/2004.04906
 [dpr-code]: https://github.com/facebookresearch/DPR
 [bart-closed-book-qa]: https://github.com/shmsw25/bart-closed-book-qa
