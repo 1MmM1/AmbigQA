@@ -13,13 +13,14 @@ This repository builds off of the original implementation of "Sewon Min, Julian 
 ```
 
 Please also make sure to credit and cite the creators of Natural Questions, the dataset which AmbigNQ is built off of:
-
+```
 @article{ kwiatkowski2019natural,
   title={ Natural questions: a benchmark for question answering research},
   author={ Kwiatkowski, Tom and Palomaki, Jennimaria and Redfield, Olivia and Collins, Michael and Parikh, Ankur and Alberti, Chris and Epstein, Danielle and Polosukhin, Illia and Devlin, Jacob and Lee, Kenton and others },
   journal={ Transactions of the Association for Computational Linguistics },
   year={ 2019 }
 }
+```
 
 This also contains a re-implementation of "Vladimir Karpukhin*, Barlas Oguz*, Sewon Min, Patrick Lewis, Ledell Wu, Sergey Edunov, Danqi Chen, Wen-tau Yih. [Dense Passage Retrieval for Open-domain Question Answering. 2020][dpr-paper]", as part of AmbigQA models. The original implementation can be found [here][dpr-code]. This codebase achieves higher accuracy.
 ```
@@ -325,6 +326,10 @@ DPR with BERT-large:
 | 4 | (8, 16) | 43.2 | 44.3 |
 | 8 | (16, 16) | 42.2 | 43.2 |
 
+SpanSeqGen with BART-large:
+| Num. of 12GB GPU(s) | (`train_batch_size`, `max_input_len`) | NQ-open EM (dev) | NQ-open F1 (test) |
+|---|---|---|---|
+| 1 | (2, 700) | 37.81 | 39.38 | 
 
 ## Interactive
 
