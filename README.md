@@ -44,9 +44,8 @@ Original content:
     * [Hyperparameter details / tuning](#hyperparameter-details--tuning)
 4. [Results](#results)
     * [Results with less resources](#results-with-less-resources)
-5. [Interactive Demo for Question Answering](#interactive)
-6. [Pretrained model checkpoint](#need-preprocessed-data--pretrained-models--predictions)
-7. [Usage examples](#usage-examples)
+5. [Pretrained model checkpoint](#need-preprocessed-data--pretrained-models--predictions)
+6. [Usage examples](#usage-examples)
     * [Train only SpanSeqGen](#train-only-spanseqgen)
 
 ## Installation
@@ -330,20 +329,6 @@ SpanSeqGen with BART-large:
 | Num. of 12GB GPU(s) | (`train_batch_size`, `max_input_len`) | NQ-open EM (dev) | NQ-open F1 (test) |
 |---|---|---|---|
 | 1 | (2, 700) | 37.81 | 39.38 | 
-
-## Interactive
-
-You can run DPR interactively as follows.
-
-```python
-from InteractiveDPR import InteractiveDPR
-interactive_dpr = InteractiveDPR(dpr_data_dir=path_to_dpr_data_dir reader_checkpoint=path_do_reader_checkpoint)
-question = "When did harry potter and the sorcerer's stone movie come out?"
-print (interactive_dpr.predict(question, topk_answer=5, only_text=True))
-```
-
-For details, please refer to `InteractiveDPR.py`
-
 
 ## Need preprocessed data / pretrained models / predictions?
 
