@@ -15,14 +15,13 @@ data_path = args.wikifile
 print("Processing", data_path, "...")
 
 data = []
-# passages = {}
-# titles = {}
+
 line_index = 0
 if data_path[-3:] == ".gz":
    with gzip.open(data_path, "rb") as f:
       _ = f.readline()
       for line in f:
-         data.append(line.decode().strip().split("\t"))
+         data.append(line.decode().strip().split("\t")[2])
          if line_index % LOG_INTERVAL == 0:
             print("Currently at line", line_index)
          line_index += 1
@@ -30,14 +29,15 @@ else:
    with open(data_path, "r") as f:
       _ = f.readline()
       for line in f:
-         data.append(line.strip().split("\t"))
+         data.append(line.strip().split("\t")[2])
          if line_index % LOG_INTERVAL == 0:
             print("Currently at line", line_index)
          line_index += 1
 print("Finished processing file.")
 
 data = np.asarray(data, dtype=str)
-title_counts = Counter(data[:,2])
+# title_counts = Counter(data[:,2])
 print("\nDataset statistics:")
 print(data.shape[0], "passages")
-print(len(title_counts), "unique titles")
+# print(len(title_counts), "unique titles")
+print(len(set(data)), "unique titles")
