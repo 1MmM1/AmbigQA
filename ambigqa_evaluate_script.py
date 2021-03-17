@@ -4,7 +4,7 @@ import json
 import string
 import argparse
 import numpy as np
-#from collections import Counter, defaultdict
+from collections import Counter, defaultdict
 
 from pycocoevalcap.tokenizer.ptbtokenizer import PTBTokenizer
 from pycocoevalcap.bleu.bleu import Bleu
@@ -228,7 +228,7 @@ def normalize_answer(s):
 
     return white_space_fix(remove_articles(remove_punc(lower(s))))
 
-def get_f1(answers, predictions, is_equal=get_exact_match):
+def get_f1(answers, predictions, is_equal=get_exact_match, return_p_and_r=False):
     '''
     :answers: a list of list of strings
     :predictions: a list of strings
@@ -246,8 +246,12 @@ def get_f1(answers, predictions, is_equal=get_exact_match):
                 occupied_predictions[j] = True
     assert np.sum(occupied_answers)==np.sum(occupied_predictions)
     a, b = np.mean(occupied_answers), np.mean(occupied_predictions)
+    if return_p_and_r:
+        if a+b==0:
+            return 0., 0., 0.
+        return 2*a*b/(a+b), float(a), float(b)
     if a+b==0:
-        return 0
+        return 0.
     return 2*a*b/(a+b)
 
 def load_reference(reference_path):
