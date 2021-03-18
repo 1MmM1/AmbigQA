@@ -2,7 +2,7 @@
 
 This repo contains multiple models for open-domain question answering. This code is based on the [original implementation](https://github.com/shmsw25/AmbigQA) and uses [PyTorch][pytorch] and [HuggingFace Transformers][hf].
 
-This repository builds off of the original implementation of "Sewon Min, Julian Michael, Hannaneh Hajishirzi, Luke Zettlemoyer. [AmbigQA: Answering Ambiguous Open-domain Questions][ambigqa-paper]. 2020". Please reference their [repository](https://github.com/shmsw25/AmbigQA) and [website](ambigqa-website) for more information on the AmbigQA task and AmbigNQ dataset, and make sure to cite their paper if you find them useful.
+This repository builds off of the original implementation of "Sewon Min, Julian Michael, Hannaneh Hajishirzi, Luke Zettlemoyer. [AmbigQA: Answering Ambiguous Open-domain Questions][ambigqa-paper]. 2020". Please reference their [repository](https://github.com/shmsw25/AmbigQA) and [website](https://nlp.cs.washington.edu/ambigqa) for more information on the AmbigQA task and AmbigNQ dataset, and make sure to cite their paper if you find them useful.
 ```
 @article{ min2020ambigqa,
     title={ {A}mbig{QA}: Answering Ambiguous Open-domain Questions },
@@ -365,8 +365,6 @@ For a sanity check, the recall accuracy should be as follows. (For AmbigQA, macr
 Coming soon!
 
 [ambigqa-paper]: https://arxiv.org/abs/2004.10645
-[ambigqa-code]: https://github.com/shmsw25/AmbigQA
-[ambigqa-website]: https://nlp.cs.washington.edu/ambigqa
 [dpr-paper]: https://arxiv.org/abs/2004.04906
 [dpr-code]: https://github.com/facebookresearch/DPR
 [bart-closed-book-qa]: https://github.com/shmsw25/bart-closed-book-qa
