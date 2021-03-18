@@ -285,7 +285,7 @@ $ python3 cli.py --do_predict --task qa --output_dir out/ambignq-span-seq-gen \
 
 **On AmbigQA:** We use `train_batch_size=8` for BERT-base and `train_batch_size=24` for BART. We use `learning_rate=5e-6` for both.
 
-To do hyperparameter tuning, simply run the included bash script as shown below. This will try several values for beam size (1, 2, 6, 10, and 12), length penalty (1, 3, 5, and 10), and no repeat ngram (0, 1, 2, 3). To try different values, please edit the `beams`, `penaltys`, and `ngrams` variables in `run_inference_hyper.sh`.
+To do the exploration of hyperparameter impact on beam size or the inference time, simply run the included bash script as shown below. This will try several values for beam size (1, 2, 6, 10, and 12), length penalty (1, 3, 5, and 10), and no repeat ngram (0, 1, 2, 3). To try different values, please edit the `beams`, `penaltys`, and `ngrams` variables in `run_inference_hyper.sh`.
 ```
 $ ./run_inference_hyper.sh
 ```
