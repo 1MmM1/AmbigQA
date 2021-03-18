@@ -469,7 +469,7 @@ $ python3 cli.py --do_train --task qa --output_dir out/ambignq-span-seq-gen \
     --train_batch_size 2 --predict_batch_size 2 \
     --eval_period 500 --wait_step 10 --ambigqa --wiki_2020 --max_answer_length 25
 
-# Do hyperparameter tuning
+# Do hyperparameter impact on inference time
 $ ./run_inference_hyper.sh
 ```
 
