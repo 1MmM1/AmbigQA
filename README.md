@@ -186,6 +186,7 @@ First, we must preprocess the dataset to be the correct format
 $ python3 download_data_extra.py --output_dir data/ \
     --dpr_data_dir {dpr_data_dir} \
     --dpr_dir out/dpr/
+    -- resouce squad
 ```
 
 Now you may train a model on SQuAD:
