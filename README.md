@@ -33,7 +33,6 @@ This also contains a re-implementation of "Vladimir Karpukhin*, Barlas Oguz*, Se
 ```
 
 ## Content
-Original content:
 1. [Installation](#installation)
 2. [Download data](#download-data)
 3. Instructions for Training & Testing
@@ -135,7 +134,7 @@ You may train the SpanSeqGen model on NQ-open (as done in the original paper) or
 
 ### Train on NQ-open
 
-Note: if you are using a checkpoint, there is no need to run the first two code segments since the passages have already been selected. You may simply run the third code segment (though please make sure that the checkpoint is located in out/`nq-span-selection`).
+Note: if you are using a checkpoint, there is no need to run the first two code segments since the passages have already been selected. You may simply run the third code segment (though please make sure that the checkpoint is located in `out/nq-span-selection`).
 
 First, tokenize passage vectors.
 ```
