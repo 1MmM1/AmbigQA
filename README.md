@@ -332,7 +332,7 @@ DPR with BERT-large:
 | 8 | (16, 16) | 42.2 | 43.2 |
 
 SpanSeqGen with BART-large:
-| Num. of 12GB GPU(s) | (`train_batch_size`, `max_input_len`) | NQ-open EM (dev) | NQ-open F1 (test) |
+| Num. of 12GB GPU(s) | (`train_batch_size`, `max_input_len`) | NQ-open EM (dev) | AmbigNQ F1 (dev) |
 |---|---|---|---|
 | 1 | (2, 700) | 37.81 | 39.38 | 
 
