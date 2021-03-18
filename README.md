@@ -68,14 +68,14 @@ $ python3 download_data.py --resource data.nqopen --output_dir data
 ```
 
 ## DPR Retrieval
-For training DPR retrieval, please refer to the [original implementation][dpr-code]. This code is for taking checkpoint from the original implementation, and running inference.
+For training DPR retrieval, please refer to the [original implementation][dpr-code]. This code is for taking checkpoint from the original implementation, and running inference. 
 
 Step 1: Download DPR retrieval checkpoint provided by DPR original implementation.
 ```
 $ python3 download_data.py --resource checkpoint.retriever.multiset.bert-base-encoder --output_dir {dpr_data_dir}
 ```
 
-Step 2: Run inference to obtain passage vectors.
+Step 2: Run inference to obtain passage vectors. Note: if you are using a checkpoint, there is no need to run this section, and you may skip to [DPR Reader (Span Selection Model)](#dpr-reader-span-selection-model).
 ```
 $ for i in 0 1 2 3 4 5 6 7 8 9 ; do \ # for parallelization
     python3 cli.py --do_predict --bert_name bert-base-uncased --output_dir out/dpr --dpr_data_dir dpr_data_dir --do_predict --task dpr --predict_batch_size 3200 --db_index $i ; \
@@ -99,6 +99,8 @@ Tip1: Running this for the first time regardless of the data split will create D
 Tip2: If you are fine with not printing the recall rate, you can specify `--skip_db_load` to save time. It will then print the recall to be 0, but the prediction file will be saved with no problem.
 
 ## DPR Reader (Span Selection Model)
+
+Note: if you are using a checkpoint, there is no need to run this section, and you may skip to [SpanSeqGen (BART Reader)](#spanseqgen-bart-reader).
 
 For training on NQ-open, run
 ```
@@ -132,6 +134,8 @@ This command runs predictions using `out/nq-span-selection/best-model.pt` by def
 You may train the SpanSeqGen model on NQ-open (as done in the original paper) or on SQuAD (new in our reproduction). Note that this model is different from BART closed-book QA model (implemented [here][bart-closed-book-qa]), because this model reads DPR retrieved passages as input.
 
 ### Train on NQ-open
+
+Note: if you are using a checkpoint, there is no need to run the first two code segments since the passages have already been selected. You may simply run the third code segment (though please make sure that the checkpoint is located in out/`nq-span-selection`).
 
 First, tokenize passage vectors.
 ```
@@ -214,7 +218,9 @@ $ python3 cli.py --do_predict --task qa --output_dir out/squad-span-seq-gen \
 
 In order to experiment on AmbigQA, you can simply repeat the process with NQ-open, with only two differences - (i) specifying `--ambigqa` and `--wiki_2020` at several places and (ii) initialize weights from models trained on NQ-open. Step-by-step instructions are as follows.
 
-First, make DPR retrieval predictions using Wikipedia 2020. You can do so by simply repeating Step 2 and Step 3 of [DPR Retrieval](#dpr-retrieval) with `--wiki_2020` specified.
+First, make DPR retrieval predictions using Wikipedia 2020. You can do so by simply repeating Step 2 and Step 3 of [DPR Retrieval](#dpr-retrieval) with `--wiki_2020` specified. 
+
+Note: if you are using a checkpoint, there is no need to run the next three code segments. You may skip directly to the fourth code segment to fine tune on AmbigNQ.
 ```
 $ for i in 0 1 2 3 4 5 6 7 8 9 ; do \ # for parallelization
     python3 cli.py --do_predict --bert_name bert-base-uncased --output_dir out/dpr --dpr_data_dir {dpr_data_dir} --do_predict --task dpr --predict_batch_size 3200 --db_index $i --wiki_2020 \
